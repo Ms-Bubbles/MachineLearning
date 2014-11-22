@@ -1,0 +1,5 @@
+https://class.coursera.org/predmachlearn-007/forum/thread?thread_id=104
+
+http://topepo.github.io/caret/training.html#metrics
+
+http://www.edii.uclm.es/~useR-2013/Tutorials/kuhn/user_caret_2up.pdf
