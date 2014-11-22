@@ -1,0 +1,47 @@
+----
+Machine Learning Course Project: HAR
+----
+
+###Synopsis
+
+###Data Processing and Analysis
+
+**Cleaning Data**
+
+Before processing the data it's important to have the data loaded in R.
+
+"classe" is our outcome i.e. variable of interest
+
+Based on the summary of the data set it is possible to conlude:
+* dimension of the set: 19622 observations of 160 variables
+* time stamp related variables were removed to avoid issues with predictions between test and training sets (different time stamps): raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp
+* variables with significant number of NAs were removed from the training set, Where significant was set arbitrary to 80%
+* variables with significant number of NAs in the test set were also removed from the training set, Where significant was set arbitrary to 80%
+* variables resulting from two above points were cossed checked to choose only the ones common for both test and training sets
+
+```{r}
+testData2 <- testData[,-c(3:5)]
+trainData2 <- trainData[,-c(3:5)]
+trainData2 <- trainData2[,colSums(is.na(trainData2)) < 0.8*nrow(trainData2)]
+drop <- testData2[,colSums(is.na(testData2)) >= 0.8*nrow(testData2)]
+trainData2 <- trainData2[, !colnames(trainData2) %in% colnames(drop)]
+
+```
+
+**Spending Data**
+
+Create data partition on the training set
+```{r}
+load(caret)
+set.seed(1210)
+
+inTrain <- createDataPartition(trainData2$classe, p = 3/4, list = FALSE)
+train <- trainData2[inTrain,]
+test <- trainData2[-inTrain,]
+myControl <- trainControl(method="cv",number=5,repeats=2,returnResamp='none')
+fitModel <- train(classe ~ ., data=train, method="rf", prox=TRUE, trControl=myControl)
+
+
+```
+
+##vip <- varImp(fitModel$finalModel)
