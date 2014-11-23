@@ -1,10 +1,19 @@
-----
-Machine Learning Course Project: HAR
-----
+---
+output: html_document
+---
+##Machine Learning Course Project: HAR
+
 
 ###Synopsis
 
-###Data Processing and Analysis
+Human Activity Recognition - HAR - has emerged as a key research area in the last years and is gaining increasing attention by the pervasive computing research community, especially for the development of context-aware systems. 
+Based on the data gathered during the research, the aim of this project was to build a model that would best predict 5 different fashions of performing excercises: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+Model chosen for this project was build using RandomForest and further will be known as **"fitModel"**.
+
+For more details please see: http://groupware.les.inf.puc-rio.br/har#ixzz3JuOSzJvu
+
+###Data Processing and Model buildings
 
 **Cleaning Data**
 
@@ -13,35 +22,109 @@ Before processing the data it's important to have the data loaded in R.
 "classe" is our outcome i.e. variable of interest
 
 Based on the summary of the data set it is possible to conlude:
+
 * dimension of the set: 19622 observations of 160 variables
 * time stamp related variables were removed to avoid issues with predictions between test and training sets (different time stamps): raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp
 * variables with significant number of NAs were removed from the training set, Where significant was set arbitrary to 80%
 * variables with significant number of NAs in the test set were also removed from the training set, Where significant was set arbitrary to 80%
 * variables resulting from two above points were cossed checked to choose only the ones common for both test and training sets
+* variables without direct relation to our model: 
 
-```{r}
-testData2 <- testData[,-c(3:5)]
-trainData2 <- trainData[,-c(3:5)]
+```{r, message=FALSE}
+testData <- read.csv("pml-testing.csv")
+trainData <- read.csv("pml-training.csv")
+
+library(caret)
+library(randomForest)
+
+testData2 <- testData[,-c(1:7)]
+trainData2 <- trainData[,-c(1:7)]
 trainData2 <- trainData2[,colSums(is.na(trainData2)) < 0.8*nrow(trainData2)]
 drop <- testData2[,colSums(is.na(testData2)) >= 0.8*nrow(testData2)]
 trainData2 <- trainData2[, !colnames(trainData2) %in% colnames(drop)]
 
 ```
 
-**Spending Data**
+Dimensions of the data set after cleaning it:
 
-Create data partition on the training set
 ```{r}
-load(caret)
+dim(trainData2)
+```
+
+**Spending Data and building a model**
+
+Create data partition on the training set and build a model using RandomForset package. Please note that performing a separate cross-validation is not required as it is already included in the model building. 
+
+*"In random forests, there is no need for cross-validation or a separate test set to get an unbiased estimate of the test set error. It is estimated internally, during the run, as follows"*  [source](http://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#ooberr)
+
+Additionally two paramteres were adjusted, the number of variables (set to 20) and variables importance computation set to on.
+
+
+```{r}
+library(caret)
+library(randomForest)
+#set seed for reproducibility
 set.seed(1210)
 
 inTrain <- createDataPartition(trainData2$classe, p = 3/4, list = FALSE)
 train <- trainData2[inTrain,]
 test <- trainData2[-inTrain,]
-myControl <- trainControl(method="cv",number=5,repeats=2,returnResamp='none')
-fitModel <- train(classe ~ ., data=train, method="rf", prox=TRUE, trControl=myControl)
-
+fitModel <- randomForest(classe ~ ., data=train,importance=TRUE, ntree=500, mdim2nd=20 , imp=1)
 
 ```
 
-##vip <- varImp(fitModel$finalModel)
+Using varImp function we try to limit the amount of variables used in the model prediction. Top20 character string contains the variables with the highest importance. 
+
+```{r}
+varImpPlot(fitModel)
+top20 <- c("yaw_belt", "roll_belt", "pitch_belt", "magnet_dumbbell_z", "magnet_dumbbell_y",
+"gyros_arm_y", "pitch_forearm", "gyros_forearm_z", "roll_arm", "accel_dumbbell_y", "gyros_dumbbell_z","magnet_belt_x", "magnet_forearm_z", "accel_dumbbell_z", "gyros_belt_z", "roll_dumbbell", "yaw_forearm", "roll_forearm", "magnet_forearm_y", "gyros_dumbbell_x")
+train2 <- train[,colnames(train) %in% top20]
+train2$classe <- train$classe
+```
+
+We re-fit the model with limited number of variables:
+
+```{r}
+fitModel2 <- randomForest(classe ~ ., data=train2,importance=TRUE, ntree=500, mdim2nd=20 , imp=2)
+```
+
+And compare the results. In both cases the accuracy is very high, however the error rates are lower in the first case and for this reason we choose it as the final model. 
+
+```{r}
+par(mfrow=c(2,1))
+par(mar = rep(2, 4))
+plot(fitModel, log="y")
+plot(fitModel2, log="y")
+
+```
+
+###Results
+
+For our final model we chose the *"fitModel"* and check the results using confusionMatrix. First on the train data, next on the test data.
+
+***Results on the training data set***
+
+```{r}
+prediction <- predict(fitModel, train)
+confusionMatrix(prediction, train$classe)
+
+```
+
+***Results on the testing data set***
+
+```{r}
+predictionTest <- predict(fitModel, test)
+confusionMatrix(predictionTest, test$classe)
+
+```
+
+
+In order to address the second part of the project i.e. predict the 20 variables, *fitModel* would be run on the *testData* data set provided in the instructions. And further submitted in 20 separate files. This is however not part of this submission and thus is only mentioned for clarity.
+
+```{r}
+answers <- predict(fitModel, testData)
+answers <- as.character(answers)
+
+```
+
